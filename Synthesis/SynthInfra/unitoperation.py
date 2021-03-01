@@ -8,34 +8,70 @@ Created on Fri Feb 26 11:59:59 2021
 import numpy as np
 # Import Rectification Operations
 
-# Filepath to the table with possible rectification columns
+# Filepath to the Excel-Sheet with possible rectification columns
 RECTIFICATION_COLUMNS = ""
+# Filepath to the Excel-Sheet containing the substances in the mixture
 SUBSTANCES = ""
 
 class Flow():
-    SUBSTANCES = load_substances()
+    """
+    This class represents the molar flow of substances.
     
-    def load_substances():
+    Attributes
+    ----------
+    SUBSTANCES : ndarray, dtype=object, shape=(n,)
+        The substances in the mixture.
+    molar_flow : ndarray, dtype=float, shape=(n,) (mol/s)
+        The molar flow of the individual substances in the mixture.
+    total_flow : float (mol/s)
+        The total molar substance flow.
+    """
+       
+    def _load_substances():
         """
-        Load Substances in the mixture
+        Load substances in the mixture. The substance data is located
+        in an Excel-Sheet at the location provided in the global 
+        variable `SUBSTANCES`.
 
         Returns
         -------
-        Ndarray dtype object with substances
-
+        substances: ndarray, dtype=object, shape=(n,)
+            The substances in the mixture.
         """
+        
         pass
     
+    # On load, get the substances in the mixture.
+    SUBSTANCES = _load_substances()
+    
     def __init__(self, molar_flows, solvent=None):
+        """
+        A flow is made up of the individual molar flows of each 
+        substance and the solvent.
+
+        Parameters
+        ----------
+        molar_flows : ndarray, dtype=flaot, shape=(n,) or 0
+            The molar flow of the individual substances.
+        solvent : Substance, optional (default: None)
+            The solvent the substances are dissolved in.
+        """
+        
+        # If the molar flow is zero, create an `ndarray`, representing
+        # each individual flow as zero.
         if molar_flows == 0:
             molar_flows = np.zeros(SUBSTANCES.shape, dtype=float)
+        
+        # Set the molar flow and solvent attributes
+        self.solvent = solvent
         self.molar_flows = molar_flows
+        
+        # Calculate the total flow
         self.total_flow = np.sum(molar_flows)
+        # Calculate the molar fractions
         self.molar_fractions = np.zeros(SUBSTANCES.shape, dtype=float)
         for i, flow in enumerate(molar_flows):
-            molar_fractions[i] = flow/self.total_flow
-        self.solvent = solvent
-    
+            self.molar_fractions[i] = flow/self.total_flow
 
 class UnitOperation():
     def __init__(self, connections, flow):
