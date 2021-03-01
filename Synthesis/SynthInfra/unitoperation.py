@@ -149,11 +149,14 @@ class Feed(UnitOperation):
     def __init__(self, flow):
         super.__init__(np.ndarray([True]), np.ndarray(flow))
 
-class Output(UnitOperation):
+class Product(UnitOperation):
     def __init__(self, feed):
-        super.__init__(np.ndarray([False]), np.ndarray(feed))        
+        super.__init__(np.ndarray([False]), np.ndarray(feed))
+
+class Waste(UnitOperation):
+    def __init__(self, feed):
+        super.__init__(np.ndarray([False]), np.ndarray(feed))          
         
-    
 class Rectification(UnitOperation):
     def load_availabe_colums():
         """
