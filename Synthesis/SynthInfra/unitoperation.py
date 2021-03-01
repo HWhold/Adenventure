@@ -55,7 +55,6 @@ class UnitOperation():
     
     def change_input(self, flow):
         self.flow[self.connections[False]] = flow
-        self.calculate_output()
     
     
     
@@ -140,7 +139,9 @@ class Rectification(UnitOperation):
             self.outputs[0][i] = dn
             self.outputs[1][i] = bn
             
-            
+    def change_input(self, flow):
+        super.change_input(flow)
+        self._compute_minimum_parameters()
         
         
         
