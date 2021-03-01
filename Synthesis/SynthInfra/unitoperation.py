@@ -146,15 +146,50 @@ class UnitOperation():
         self.flow[self.connections[False]] = flow
     
 class Feed(UnitOperation):
+    """
+    A unit operation describing the feed of a system of unit operations.
+    """
     def __init__(self, flow):
+        """
+        Initialize the feed.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The feed flow.
+        """
         super.__init__(np.ndarray([True]), np.ndarray(flow))
 
 class Product(UnitOperation):
+    """
+    A unit operation describing the product endpoint of a system of 
+    unit operations.
+    """
     def __init__(self, feed):
+        """
+        Initialize the product end point.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The product flow.
+        """
         super.__init__(np.ndarray([False]), np.ndarray(feed))
 
 class Waste(UnitOperation):
+    """
+    A unit operation describing the waste endpoint of a system of 
+    unit operations.
+    """
     def __init__(self, feed):
+        """
+        Initialize the waste end point.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The waste flow.
+        """
         super.__init__(np.ndarray([False]), np.ndarray(feed))          
         
 class Rectification(UnitOperation):
