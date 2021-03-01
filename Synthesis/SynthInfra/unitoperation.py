@@ -77,7 +77,8 @@ class Rectification(UnitOperation):
 
     def __init__(self, feed, product_purity, product_yield, pressure=1e5):
         super.__init__(np.ndarray([False, True, True]), [feed, Flow(0), Flow(0)])
-        
+        self.product_purity = product_purity
+        self.product_yield = product_yield
         possible_columns = np.where(
             (AVAILABLE_COLUMNS > self.N_min) & (ACTIVELY_USED == False) 
         )[0]
@@ -128,11 +129,18 @@ class Rectification(UnitOperation):
             light_boiler, heavy_boiler, temp_bottom, temp_top, feed_purity, 
             product_yield, product_purity
         )
-        
-    
     
     def calculate_output(self):
-        fug.multicomponent_composition()
+        for i, (nonkey_substance, nonkey_feed) in enumerate(zip(self.inputs[0].SUBSTANCES, self.inputs[0].molar_flows)):
+            bn, dn = multicomponent_composition(
+                nonkey_substance, self.inputs[0].SUBSTANCES[0], self.temp_bottom, self.temp_top, 
+                self.inputs[0].molar_fractions[0], self.product_yield, self.product_purity, nonkey_feed, 
+                self.inputs[0].molar_flows[0], self.N, reference_is_distillate=self.product_is_distillate
+            ):
+            self.outputs[0][i] = dn
+            self.outputs[1][i] = bn
+            
+            
         
         
         
