@@ -79,8 +79,9 @@ class Rectification(UnitOperation):
         super.__init__(np.ndarray([False, True, True]), [feed, Flow(0), Flow(0)])
         self.product_purity = product_purity
         self.product_yield = product_yield
+        self.pressure = pressure
         possible_columns = np.where(
-            (AVAILABLE_COLUMNS > self.N_min) & (ACTIVELY_USED == False) 
+            (self.AVAILABLE_COLUMNS > self.N_min) & (self.ACTIVELY_USED == False) 
         )[0]
         column = np.random.choice(possible_columns)
         self.ACTIVELY_USED[column] = True
@@ -92,14 +93,13 @@ class Rectification(UnitOperation):
         vapor_pressure = np.zeros(feed.SUBSTANCES.shape, dtype=float)
         boiling_point = np.zeros(feed.SUBSTANCES.shape, dtype=float)
         # Assume boiling point of product for vapor pressure estimation
-        boiling_point_product = feed.SUBSTANCES[0].boiling_point(pressure)
+        boiling_point_product = feed.SUBSTANCES[0].boiling_point(self.pressure)
         vapor_pressure_product = feed.SUBSTANCES[0].vapor_pressure(boiling_point_product)
         # Assume Product is the most common substance, other key is second most common
         other_key_index = np.argsort(feed.molar_flows)[-2]
-        other_key = feed.SUBSTANCES[other_key_index]
         for i, substance in enumerate(feed.SUBSTANCES):
             vapor_pressure[i] = substance.vapor_pressure(boiling_point_product)
-            boiling_point[i] = substance.boiling_point(pressure)
+            boiling_point[i] = substance.boiling_point(self.pressure)
         if vapor_pressure_product > vapor_pressure[other_key_index]:
             self.product_is_distillate = True
             light_boiler = feed.SUBSTANCES[0]
@@ -126,17 +126,17 @@ class Rectification(UnitOperation):
         
                 
         self.N_min, self.R_min = fug.fug_minimum_parameters(
-            light_boiler, heavy_boiler, temp_bottom, temp_top, feed_purity, 
-            product_yield, product_purity
+            light_boiler, heavy_boiler, self.temp_bottom, self.temp_top, feed_purity, 
+            self.product_yield, self.product_purity
         )
     
     def calculate_output(self):
         for i, (nonkey_substance, nonkey_feed) in enumerate(zip(self.inputs[0].SUBSTANCES, self.inputs[0].molar_flows)):
-            bn, dn = multicomponent_composition(
+            bn, dn = fug.multicomponent_composition(
                 nonkey_substance, self.inputs[0].SUBSTANCES[0], self.temp_bottom, self.temp_top, 
                 self.inputs[0].molar_fractions[0], self.product_yield, self.product_purity, nonkey_feed, 
                 self.inputs[0].molar_flows[0], self.N, reference_is_distillate=self.product_is_distillate
-            ):
+            )
             self.outputs[0][i] = dn
             self.outputs[1][i] = bn
             
