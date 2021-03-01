@@ -56,7 +56,14 @@ class UnitOperation():
     def change_input(self, flow):
         self.flow[self.connections[False]] = flow
     
-    
+class Feed(UnitOperation):
+    def __init__(self, flow):
+        super.__init__(np.ndarray([True]), np.ndarray(flow))
+
+class Output(UnitOperation):
+    def __init__(self, feed):
+        super.__init__(np.ndarray([False]), np.ndarray(feed))        
+        
     
 class Rectification(UnitOperation):
     def load_availabe_colums():
@@ -75,7 +82,7 @@ class Rectification(UnitOperation):
     ACTIVELY_USED = np.zeros(AVAILABLE_COLUMNS.shape, dtype=bool)
 
     def __init__(self, feed, product_purity, product_yield, pressure=1e5):
-        super.__init__(np.ndarray([False, True, True]), [feed, Flow(0), Flow(0)])
+        super.__init__(np.ndarray([False, True, True]), np.ndarray([feed, Flow(0), Flow(0)]))
         self.product_purity = product_purity
         self.product_yield = product_yield
         self.pressure = pressure
