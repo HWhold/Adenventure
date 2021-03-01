@@ -77,6 +77,16 @@ class Rectification(UnitOperation):
 
     def __init__(self, feed, product_purity, product_yield, pressure=1e5):
         super.__init__(np.ndarray([False, True, True]), [feed, Flow(0), Flow(0)])
+        
+        possible_columns = np.where(
+            (AVAILABLE_COLUMNS > self.N_min) & (ACTIVELY_USED == False) 
+        )[0]
+        column = np.random.choice(possible_columns)
+        self.ACTIVELY_USED[column] = True
+        self.N = self.AVAILABLE_COLUMNS[column]
+    
+    def _compute_minimum_parameters(self):
+        feed = self.inputs[0]
         feed_purity = feed.mole_fractions[0]
         vapor_pressure = np.zeros(feed.SUBSTANCES.shape, dtype=float)
         boiling_point = np.zeros(feed.SUBSTANCES.shape, dtype=float)
@@ -90,13 +100,13 @@ class Rectification(UnitOperation):
             vapor_pressure[i] = substance.vapor_pressure(boiling_point_product)
             boiling_point[i] = substance.boiling_point(pressure)
         if vapor_pressure_product > vapor_pressure[other_key_index]:
-            product_is_distillate = True
+            self.product_is_distillate = True
             light_boiler = feed.SUBSTANCES[0]
             heavy_boiler = feed.SUBSTANCES[other_key_index]
-            temp_top = boiling_point_product
+            self.temp_top = boiling_point_product
             
             heavier_than_product = np.where(vapor_pressure < vapor_pressure_product)[0]
-            temp_bottom = np.dot(
+            self.temp_bottom = np.dot(
                 feed.mole_fractions[heavier_than_product],
                 boiling_point[heavier_than_product]
             )
@@ -105,10 +115,10 @@ class Rectification(UnitOperation):
             self.product_is_distillate = False
             light_boiler = feed.SUBSTANCES[other_key_index]
             heavy_boiler = feed.SUBSTANCES[0]
-            temp_bottom = boiling_point_product
+            self.temp_bottom = boiling_point_product
             
             lighter_than_product = np.where(vapor_pressure < vapor_pressure_product)[0]
-            temp_bottom = np.dot(
+            self.temp_top = np.dot(
                 feed.mole_fractions[lighter_than_product],
                 boiling_point[lighter_than_product]
             )
@@ -118,19 +128,10 @@ class Rectification(UnitOperation):
             light_boiler, heavy_boiler, temp_bottom, temp_top, feed_purity, 
             product_yield, product_purity
         )
-        possible_columns = np.where(
-            (AVAILABLE_COLUMNS > self.N_min) & (ACTIVELY_USED == False) 
-        )[0]
-        column = np.random.choice(possible_columns)
-        self.ACTIVELY_USED[column] = True
-        self.N = self.AVAILABLE_COLUMNS[column]
-    
-    def _compute_minimum_parameters():
-        feed = self.inputs[0]
+        
     
     
     def calculate_output(self):
-        if se
         fug.multicomponent_composition()
         
         
