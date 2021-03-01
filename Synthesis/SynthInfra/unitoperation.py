@@ -19,10 +19,13 @@ class Flow():
     
     Attributes
     ----------
-    SUBSTANCES : ndarray, dtype=object, shape=(n,)
+    SUBSTANCES : ndarray, dtype=Substance, shape=(n,)
         The substances in the mixture.
     molar_flow : ndarray, dtype=float, shape=(n,) (mol/s)
         The molar flow of the individual substances in the mixture.
+    molar_fractions: ndarray, dtype=float, shape=(n,)
+        The molar fractions of the substances in respect to the total
+        molar flow.
     total_flow : float (mol/s)
         The total molar substance flow.
     """
@@ -74,22 +77,72 @@ class Flow():
             self.molar_fractions[i] = flow/self.total_flow
 
 class UnitOperation():
+    """
+    This class is the base class for all Unit Operations.
+    
+    Attributes
+    ----------
+    connections : ndarray, dtype=bool, shape=(n,)
+        The inputs (False) and outputs (True) of a given unit operation.
+    flow : ndarray, dtype=Flow, shape=(n,)
+        The flow for each connection.
+    inputs : ndarray, dtype=Flow
+        The inputs of the unit operation.
+    outputs : ndarray, dtype=Flow
+        The outputs of the unit operation.
+    """
+    
     def __init__(self, connections, flow):
+        """
+        Initialize the unit operation, given its connections and flows.
+
+        Parameters
+        ----------
+        connections : ndarray, dtype=bool, shape=(n,)
+            The inputs (False) and outputs (True) of a given unit 
+            operation.
+        flow : ndarray, dtype=Flow, shape=(n,)
+            The flow for each connection.
+        """
         self.connections = connections
         self.flow = flow
+        # False connections correspond to inputs
         self.inputs = flow[connections[False]]
+        # True connections correspond to outputs
         self.outputs = flow[connections[True]]
     
     def calculate_cost(self):
+        """
+        Calculate the cost of the unit operation. The base unit 
+        operation is free.
+
+        Returns
+        -------
+        cost : flaot
+            The cost of the unit operation.
+        """
         return 0
     
     def calculate_output(self):
-        # By default split inputs to outputs
+        """
+        Calculate the output of the unit operation. By default the 
+        input molar stream is distributed evenly across the outputs.
+        """
         self.flow[self.connections[True]] = np.array(
             [np.sum(self.inputs, axis=0)/len(self.outputs)]*len(self.outputs)
         )
-    
+        
+        
     def change_input(self, flow):
+        """
+        Change the input of a given unit operation. The output is not
+        automatically updated and has to be recalculated manually.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(n,)
+            The flow for each connection.
+        """
         self.flow[self.connections[False]] = flow
     
 class Feed(UnitOperation):
