@@ -7,6 +7,7 @@ Created on Fri Feb 26 11:59:59 2021
 
 import numpy as np
 # Import Rectification Operations
+from ...ProcessModels.Distillation.fug import fug_minimum_parameters, multicomponent_composition
 
 # Filepath to the Excel-Sheet with possible rectification columns
 RECTIFICATION_COLUMNS = ""
@@ -347,7 +348,7 @@ class Rectification(UnitOperation):
             )
         
         # Calculate the minimum values        
-        self.N_min, self.R_min = fug.fug_minimum_parameters(
+        self.N_min, self.R_min = fug_minimum_parameters(
             light_boiler, heavy_boiler, self.temp_bottom, self.temp_top, feed_purity, 
             self.product_yield, self.product_purity
         )
@@ -360,7 +361,7 @@ class Rectification(UnitOperation):
         # Calculate the output for each component in the feed, according
         # to the required product yield and purity.
         for i, (nonkey_substance, nonkey_feed) in enumerate(zip(self.inputs[0].SUBSTANCES, self.inputs[0].molar_flows)):
-            bn, dn = fug.multicomponent_composition(
+            bn, dn = multicomponent_composition(
                 nonkey_substance, self.inputs[0].SUBSTANCES[0], self.temp_bottom, self.temp_top, 
                 self.inputs[0].molar_fractions[0], self.product_yield, self.product_purity, nonkey_feed, 
                 self.inputs[0].molar_flows[0], self.N, reference_is_distillate=self.product_is_distillate
