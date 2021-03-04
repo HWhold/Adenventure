@@ -8,6 +8,7 @@ Created on Fri Feb 26 11:59:59 2021
 import numpy as np
 # Import Rectification Operations
 from ...ProcessModels.Distillation.fug import fug_minimum_parameters, multicomponent_composition
+from ...ProcessModels.Extraction.kremser import get_stage_number, multicomponent_composition
 
 # Filepath to the Excel-Sheet with possible rectification columns
 RECTIFICATION_COLUMNS = ""
@@ -160,6 +161,23 @@ class Feed(UnitOperation):
             The feed flow.
         """
         super.__init__(np.ndarray([True]), np.ndarray(flow))
+        
+class SolventFeed(UnitOperation):
+    """
+    A unit operation describing the feed of a system of unit operations.
+    """
+    def __init__(self, solvent):
+        """
+        Initialize the feed.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The feed flow.
+        """
+        flow = Flow(0, solvent=solvent)
+        super.__init__(np.ndarray([True]), np.ndarray(flow))
+        
 
 class Product(UnitOperation):
     """
@@ -381,5 +399,36 @@ class Rectification(UnitOperation):
         self._compute_minimum_parameters()
         
         
+class Extraction(UnitOperation):
+    def load_available_apparatuses():
+        pass
+    def load_available_solvent_combinations():
+        pass
+    # Real Available Columns
+    AVAILABLE_APPARATUSES = load_available_apparatuses()
+    # Actively Used Columns
+    ACTIVELY_USED = np.zeros(AVAILABLE_APPARATUSES.shape, dtype=bool)
+    # Available solvent combinations for extraction 
+    AVAILABLE_SOLVENT_COMBINATIONS = load_available_solvent_combinations()
+
+    def __init__(self, feed, product_purity, product_yield):
+        self.V_L = 10
+        np.random.shuffle(self.AVAILABLE_SOLVENT_COMBINATIONS)
+        self.product_purity = product_purity
+        self.solvent1, self.solvent2, self.temperature = self.AVAILABLE_SOLVENT_COMBINATIONS[0]
+        N_min = get_stage_number(self.feed.SUBSTANCES[0], self.solvent1, self.solvent2, self.temperature, self.feed.molar_fractions[0], product_purity, self.V_L)
+        possible_columns = np.where(
+            (self.AVAILABLE_APPARATUSES > self.N_min) & (self.ACTIVELY_USED == False) 
+        )[0]
+        column = np.random.choice(possible_columns)
+        self.N = self.AVAILABLE_COLUMNS[column]
         
-        
+        #TODO: Somehow get K-Values
+        self.K_values = np.ndarray()
+    
+    def calculate_output(self):
+        for i, (K, x_in) in enumerate(zip(self.K_values, self.inputs[0].molar_fractions)):
+            x_out = calc_comp_kremser(K, x_in, self.N, self.V_L)
+    
+    def get_solvent_requirements():
+        return self.solvent1, self.solvent2
