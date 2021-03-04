@@ -6,12 +6,6 @@ Created on Mon Feb 22 14:05:51 2021
 """
 import numpy as np
 
-def get_solubility(substance, solvent, temperature):
-    pass
-
-def get_K_value(substance, solvent, temperature):
-    pass
-
 def calc_kremser(K, x_in, x_out, V_L):
     # K distribution coefficient [-]
     # x_in, xout compositions start and end in [mol/mol]
@@ -35,18 +29,15 @@ def calc_comp_kremser(K, x_in, n, V_L):
     
     return x_in/part2
 
-def get_stage_number(product, solvent, temperature, feed_purity, product_purity, V_L):
-    solubility = get_solubility(product, solvent, temperature)
+def get_stage_number(solubility, K, feed_purity, product_purity, V_L):
     # Calculate the solvent fraction of the product at feed
     x_in = feed_purity / ( 1 + (product_purity / solubility) )
     # Calculate the solvent fraction of the product stream
     x_out = product_purity / ( 1 + (feed_purity / solubility) )
-    # Get the Equilibrium Constant
-    K = get_K_value(product, solvent, temperature)
     
     return calc_kremser(K, x_in, x_out, V_L)
 
-def multicomponent_composition(substance, solvent, product, temperature, product_purity, feed_purity, V_L, stages):
+def multicomponent_composition(substance, solvent1, product, temperature, product_purity, feed_purity, V_L, stages):
     # feed purity of *substance*
     # product purity of *product*
     # Calculate the solubility
