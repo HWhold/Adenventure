@@ -1,0 +1,493 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Feb 26 11:59:59 2021
+
+@author: M302212
+"""
+__name__ = "Adenventure.Synthesis.SynthInfra"
+
+import numpy as np
+# Import Rectification Operations
+from ...ProcessModels.Distillation.fug import fug_minimum_parameters, multicomponent_composition
+from ...ProcessModels.Extraction.kremser import get_stage_number, multicomponent_composition
+from .substance import Substance
+
+# Filepath to the Excel-Sheet with possible rectification columns
+RECTIFICATION_DATA = ""
+# Filepath to the Excel-Sheet containing the substances in the mixture
+SUBSTANCE_DATA = ""
+
+class Flow():
+    """
+    This class represents the molar flow of substances.
+    
+    Attributes
+    ----------
+    SUBSTANCES : ndarray, dtype=Substance, shape=(n,)
+        The substances in the mixture.
+    SOLVENTS : ndarray, dtype=Solvent, shape=(n,)
+        The solvents in the mixture.
+    molar_flow : ndarray, dtype=float, shape=(n,) (mol/s)
+        The molar flow of the individual substances in the mixture
+        (solvent free).
+    molar_fractions: ndarray, dtype=float, shape=(n,)
+        The molar fractions of the substances with respect to the total
+        molar flow.
+    total_flow : float (mol/s)
+        The total molar substance flow (solvent free).
+    solvent_molar_flow : float, optional (default: 0) (mol/s)
+        The molar flow of the solvent.
+    """
+       
+    def _load_substances():
+        """
+        Load substances and solvents in the mixture. The data is 
+        located in Excel-Sheets at the location provided in the global 
+        variable `SUBSTANCES`.
+
+        Returns
+        -------
+        SUBSTANCES: ndarray, dtype=Substance, shape=(n,)
+            The substances in the mixture.
+        SOLVENTS: ndarray, dtype=Solvent, shape=(n,)
+            The solvents in the mixture.
+        """
+        
+        return np.array([Substance(), Substance()]), np.array([Substance(), Substance()])
+    
+    # On load, get the substances in the mixture.
+    SUBSTANCES, SOLVENTS = _load_substances()
+    
+    def __init__(self, molar_flows, solvent=None, solvent_molar_flow=0):
+        """
+        A flow is made up of the individual molar flows of each 
+        substance and the solvent.
+
+        Parameters
+        ----------
+        molar_flows : ndarray, dtype=flaot, shape=(n,) or 0 (mol/s)
+            The molar flow of the individual substances.
+        solvent : Substance, optional (default: None)
+            The solvent the substances are dissolved in.
+        solvent_molar_flow : float, optional (default: 0) (mol/s)
+            The molar flow of the solvent.
+        """
+        
+        # If the molar flow is zero, create an `ndarray`, representing
+        # each individual flow as zero.
+        if np.all(molar_flows == 0):
+            molar_flows = np.zeros(self.SUBSTANCES.shape, dtype=float)
+        
+        # Set the molar flow and solvent attributes
+        self.solvent = solvent
+        self.solvent_molar_flow = solvent_molar_flow
+        self.molar_flows = molar_flows
+        
+    @property
+    def total_flow(self):
+        # Calculate the total flow
+        return np.sum(self.molar_flows)
+    
+    @property
+    def molar_fractions(self):
+        # Calculate the molar fractions
+        molar_fractions = np.zeros(self.SUBSTANCES.shape, dtype=float)
+        for i, flow in enumerate(self.molar_flows):
+            molar_fractions[i] = flow/self.total_flow
+        return molar_fractions
+            
+class UnitOperation():
+    """
+    This class is the base class for all Unit Operations.
+    
+    Attributes
+    ----------
+    connections : ndarray, dtype=bool, shape=(n,)
+        The inputs (False) and outputs (True) of a given unit operation.
+    flow : ndarray, dtype=Flow, shape=(n,)
+        The flow for each connection.
+    inputs : ndarray, dtype=Flow
+        The inputs of the unit operation.
+    outputs : ndarray, dtype=Flow
+        The outputs of the unit operation.
+    """
+    
+    def __init__(self, connections, flow):
+        """
+        Initialize the unit operation, given its connections and flows.
+
+        Parameters
+        ----------
+        connections : ndarray, dtype=bool, shape=(n,)
+            The inputs (False) and outputs (True) of a given unit 
+            operation.
+        flow : ndarray, dtype=Flow, shape=(n,)
+            The flow for each connection.
+        """
+        self.connections = connections
+        self.flow = flow
+        
+    @property
+    def inputs(self):
+        # False connections correspond to inputs
+        return self.flow[self.connections == False]
+    
+    @property
+    def outputs(self):
+        # True connections correspond to outputs
+        return self.flow[self.connections == True]
+    
+    @property
+    def is_endpoint(self):
+        if len(self.outputs) == 0:
+            return True
+        return False
+    
+    @property
+    def is_startingpoint(self):
+        if len(self.inputs) == 0:
+            return True
+        return False
+        
+    def calculate_cost(self):
+        """
+        Calculate the cost of the unit operation. The base unit 
+        operation is free.
+
+        Returns
+        -------
+        cost : flaot
+            The cost of the unit operation.
+        """
+        return 0
+    
+    def calculate_output(self):
+        """
+        Calculate the output of the unit operation. By default the 
+        input molar stream is distributed evenly across the outputs.
+        """
+        if len(self.outputs) == 0:
+            return None
+        total_input = np.zeros_like(self.inputs[0].molar_flows)
+        for this_input in self.inputs:
+            total_input += this_input.molar_flows
+        substance_flow = np.array(
+            [total_input/len(self.outputs)]*len(self.outputs)
+        )
+        solvent = None
+        solvent_flow = 0
+        for single_input in self.inputs:
+            if single_input.solvent is not None:
+                if solvent is None:
+                    solvent = single_input.solvent
+                elif solvent != single_input.solvent:
+                    # TODO: Exception Handling
+                    pass
+                else:
+                    solvent_flow += single_input.solvent_molar_flow
+        solvent_flow = np.array(
+            [solvent_flow/len(self.outputs)]*len(self.outputs)
+        )
+        for i, output in enumerate(self.flow[self.connections == True]):
+            self.flow[self.connections == True] = Flow(
+                substance_flow[i], solvent=solvent, solvent_molar_flow=solvent_flow[i])
+        
+        
+    def change_input(self, flow):
+        """
+        Change the input of a given unit operation. The output is not
+        automatically updated and has to be recalculated manually.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(n,)
+            The flow for each connection.
+        """
+        self.flow[self.connections == False] = flow
+    
+class Feed(UnitOperation):
+    """
+    A unit operation describing the feed of a system of unit operations.
+    """
+    def __init__(self, flow):
+        """
+        Initialize the feed.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The feed flow.
+        """
+        super().__init__(np.array([True]), np.array([flow]))
+
+class Product(UnitOperation):
+    """
+    A unit operation describing the product endpoint of a system of 
+    unit operations.
+    """
+    def __init__(self, flow):
+        """
+        Initialize the product end point.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The product flow.
+        """
+        super().__init__(np.array([False]), np.array([flow]))
+
+class Waste(UnitOperation):
+    """
+    A unit operation describing the waste endpoint of a system of 
+    unit operations.
+    """
+    def __init__(self, flow):
+        """
+        Initialize the waste end point.
+        
+        Parameters
+        ----------
+        flow : ndarray, dtype=Flow, shape=(1,)
+            The waste flow.
+        """
+        super().__init__(np.array([False]), np.array([flow]))
+
+class Dummy(UnitOperation):
+    def __init__(self, feed, product_purity, product_yield):
+        super().__init__(np.array([False, True, True]), np.array([feed, Flow(0), Flow(0)]))
+        self.product_purity = product_purity
+        self.product_yield = product_yield
+    def calculate_cost(self):
+        return -1
+        
+        
+class Rectification(UnitOperation):
+    """
+    A unit operation describing a rectification column. The FUG method
+    is employed for all calculations.
+    
+    Attributes
+    ----------
+    AVAILABLE_COLUMNS : ndarray, dype=float, shape=(n,)
+        The tray number of the available columns.
+    ACTIVELY_USED : ndarray, dtype=bool, shape=(n,)
+        A boolean ndarray indicating whether each available column is 
+        actively used.
+    product_purity : float
+        The mole fraction of the product.
+    product_yield : float
+        The desired molar product yield.
+    pressure : float (Pa)
+        The pressure inside the rectification column.
+    N_min : float
+        The minimum number of stages to separate the product for the
+        current feed.
+    R_min : float
+        The minimum reflux ratio to separate the product for the 
+        current feed.
+    N : int
+        The number of stages of the currently selected column.
+    """
+    def load_availabe_colums():
+        """
+        Load Available Rectification Columns (Stage Number) from File
+    
+        Returns
+        -------
+        Ndarray with Stage number
+    
+        """
+        return np.array([0, 0])
+    # Real Available Columns
+    AVAILABLE_COLUMNS = load_availabe_colums()
+    # Actively Used Columns
+    ACTIVELY_USED = np.zeros(AVAILABLE_COLUMNS.shape, dtype=bool)
+
+    def __init__(self, feed, product_purity, product_yield, pressure=1e5):
+        """
+        Initialize the rectification column.
+        
+        Parameters
+        ----------
+        feed : flow
+            The feed flow.
+        product_purity : float
+            The mole fraction of the product.
+        product_yield : float
+            The desired molar product yield.
+        pressure : float (Pa)
+            The pressure inside the rectification column.
+
+        """
+        # Initialize the inputs and outputs
+        super.__init__(np.ndarray([False, True, True]), np.ndarray([feed, Flow(0), Flow(0)]))
+        # Set the unit operations specific attributes
+        self.product_purity = product_purity
+        self.product_yield = product_yield
+        self.pressure = pressure
+        # Compute the minimum parameters of the unit operation
+        self.compute_minimum_parameters()
+        # Use the minimum stage number to randomly select a valid column
+        possible_columns = np.where(
+            (self.AVAILABLE_COLUMNS > self.N_min) & (self.ACTIVELY_USED == False) 
+        )[0]
+        column = np.random.choice(possible_columns)
+        # Set the selected column as active, such that it is not used
+        # multiple times
+        self.ACTIVELY_USED[column] = True
+        # Safe the number of stage of the currently selected column
+        self.N = self.AVAILABLE_COLUMNS[column]
+    
+    def _compute_minimum_parameters(self):
+        """
+        Compute the minimum parameters for the given rectification 
+        column.
+        """
+        # Rename feed for easy usage
+        feed = self.inputs[0]
+        # Get the feed purity
+        feed_purity = feed.mole_fractions[0]
+        # Arrays that store the respective vapor pressures and boiling
+        # points of the substances at the given pressures and 
+        # compositions.
+        vapor_pressure = np.zeros(feed.SUBSTANCES.shape, dtype=float)
+        boiling_point = np.zeros(feed.SUBSTANCES.shape, dtype=float)
+        # Assume boiling point of product for vapor pressure estimation.
+        boiling_point_product = feed.SUBSTANCES[0].boiling_point(self.pressure)
+        vapor_pressure_product = feed.SUBSTANCES[0].vapor_pressure(boiling_point_product)
+        # Assume Product is the most common substance, 
+        # other key is second most common
+        other_key_index = np.argsort(feed.molar_flows)[-2]
+        
+        # Compute the vapor pressure and boiling point for each 
+        # substance
+        for i, substance in enumerate(feed.SUBSTANCES):
+            vapor_pressure[i] = substance.vapor_pressure(boiling_point_product)
+            boiling_point[i] = substance.boiling_point(self.pressure)
+            
+        # if the product is the light boiler, calculate top and bottom
+        # temperatures accordingly
+        if vapor_pressure_product > vapor_pressure[other_key_index]:
+            # The product is the light boiler and thus distillate
+            self.product_is_distillate = True
+            
+            # Get the light and heavy boilder Substance objects.
+            light_boiler = feed.SUBSTANCES[0]
+            heavy_boiler = feed.SUBSTANCES[other_key_index]
+            
+            # The temperature at the top of the column is equivalent
+            # to the boiling point of the product.
+            self.temp_top = boiling_point_product
+            
+            # All substances with a lower vapor pressure are heavier 
+            # than the product
+            heavier_than_product = np.where(vapor_pressure < vapor_pressure_product)[0]
+            # The boiling point at the bottom of the rectification 
+            # columnn is assumed to be according to the fractions of
+            # the heavier substances.
+            self.temp_bottom = np.dot(
+                feed.mole_fractions[heavier_than_product],
+                boiling_point[heavier_than_product]
+            )
+            
+        # if the product is the heavy boiler, calculate top and bottom
+        # temperatures accordingly    
+        else:
+            # The product is the heavy boiler and thus distillate.
+            self.product_is_distillate = False
+            
+            # Get the light and heavy boilder Substance objects.
+            light_boiler = feed.SUBSTANCES[other_key_index]
+            heavy_boiler = feed.SUBSTANCES[0]
+            
+            # The temperature at the bottom of the column is equivalent
+            # to the boiling point of the product.
+            self.temp_bottom = boiling_point_product
+            
+            # All substances with a higher vapor pressure are lighter 
+            # than the product
+            lighter_than_product = np.where(vapor_pressure > vapor_pressure_product)[0]
+            # The boiling point at the top of the rectification 
+            # columnn is assumed to be according to the fractions of
+            # the lighter substances.
+            self.temp_top = np.dot(
+                feed.mole_fractions[lighter_than_product],
+                boiling_point[lighter_than_product]
+            )
+        
+        # Calculate the minimum values        
+        self.N_min, self.R_min = fug_minimum_parameters(
+            light_boiler, heavy_boiler, self.temp_bottom, self.temp_top, feed_purity, 
+            self.product_yield, self.product_purity
+        )
+    
+    def calculate_output(self):
+        """
+        Calculate the output of the rectification based on the input
+        and column type.
+        """
+        # Calculate the output for each component in the feed, according
+        # to the required product yield and purity.
+        for i, (nonkey_substance, nonkey_feed) in enumerate(zip(self.inputs[0].SUBSTANCES, self.inputs[0].molar_flows)):
+            bn, dn = multicomponent_composition(
+                nonkey_substance, self.inputs[0].SUBSTANCES[0], self.temp_bottom, self.temp_top, 
+                self.inputs[0].molar_fractions[0], self.product_yield, self.product_purity, nonkey_feed, 
+                self.inputs[0].molar_flows[0], self.N, reference_is_distillate=self.product_is_distillate
+            )
+            self.outputs[0][i] = dn
+            self.outputs[1][i] = bn
+            
+    def change_input(self, flow):
+        """
+        Change the input of the rectification column.
+        """
+        # Adjust the input parameters
+        super.change_input(flow)
+        # Recalculate the minimum parameters. This is neccessary as the
+        # reflux has to be adjusted in order to match the product yield
+        # if the feed composition changes.
+        self._compute_minimum_parameters()
+        
+    def reset_UO(self):
+        return Rectification(self.inputs[0], self.product_purity, self.product_yield, pressure=self.pressure)
+        
+# TODO: Implement Extraction
+"""
+class SolventChange(UnitOperation):
+    def __init__(self, feed, solvent, solvent_molar_flow):
+        super.__init__(np.ndarray([False, True, True]), np.ndarray([feed, Flow(0, solvent=solvent, solvent_molar_flow=solvent_molar_flow)]))
+
+class Extraction(UnitOperation):
+    def load_available_apparatuses():
+        pass
+    def load_available_solvent_combinations():
+        pass
+    # Real Available Columns
+    AVAILABLE_APPARATUSES = load_available_apparatuses()
+    # Actively Used Columns
+    ACTIVELY_USED = np.zeros(AVAILABLE_APPARATUSES.shape, dtype=bool)
+    # Available solvent combinations for extraction 
+    AVAILABLE_SOLVENT_COMBINATIONS = load_available_solvent_combinations()
+
+    def __init__(self, feed, product_purity, product_yield):
+        self.V_L = 10
+        np.random.shuffle(self.AVAILABLE_SOLVENT_COMBINATIONS)
+        self.product_purity = product_purity
+        self.solvent1, self.solvent2, self.temperature = self.AVAILABLE_SOLVENT_COMBINATIONS[0]
+        N_min = get_stage_number(self.feed.SUBSTANCES[0], self.solvent1, self.solvent2, self.temperature, self.feed.molar_fractions[0], product_purity, self.V_L)
+        possible_columns = np.where(
+            (self.AVAILABLE_APPARATUSES > self.N_min) & (self.ACTIVELY_USED == False) 
+        )[0]
+        column = np.random.choice(possible_columns)
+        self.N = self.AVAILABLE_COLUMNS[column]
+        
+        #TODO: Somehow get K-Values
+        self.K_values = np.ndarray()
+    
+    def calculate_output(self):
+        for i, (K, x_in) in enumerate(zip(self.K_values, self.inputs[0].molar_fractions)):
+            x_out = calc_comp_kremser(K, x_in, self.N, self.V_L)
+    
+    def get_solvent_requirements():
+        return self.solvent1, self.solvent2
+"""
