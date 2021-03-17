@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 
-
+__name__ = "synthesis.equations.fug"
 def fug_minimum_parameters(
         light_boiler, heavy_boiler, temp_bottom, temp_top, 
         feed_purity, product_yield, product_purity, product_is_distillate=True

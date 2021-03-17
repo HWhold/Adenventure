@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import pytest
 import pandas as pd
-from .. import fug
-from ..substance import substance
+from ..fug import fug_minimum_parameters, feed_tray_position, \
+                  multicomponent_composition
+from ....Synthesis.SynthInfra.substance import substance
 
 def test_fug_minimum_parameters():
     """
@@ -24,7 +25,7 @@ def test_fug_minimum_parameters():
         heavy_substance = substance(
             lambda t: row['ps_heavy_bottom'] if t == row['temp_bottom'] else row['ps_heavy_top']
         )
-        N_min, R_min = fug.fug_minimum_parameters(
+        N_min, R_min = fug_minimum_parameters(
             light_substance, heavy_substance,
             row['temp_bottom'], row['temp_top'],
             row['feed_purity'], 
@@ -41,7 +42,7 @@ def test_feed_tray_position():
     """
     df = pd.read_excel("data\\fug\\binary.xlsx").dropna()
     for i, row in df.iterrows():
-        feed_tray = fug.feed_tray_position(
+        feed_tray = feed_tray_position(
             row['feed_purity'],
             row['product_yield'],
             row['product_purity'],
@@ -59,7 +60,7 @@ def test_exact_feed_tray_position():
     product_yield = ((0.792/0.794)*0.794)/(0.8*1)
     product_purity = 0.792/0.794
     N = 22.9998
-    feed_tray = fug.feed_tray_position(feed_purity, product_yield, product_purity, N)
+    feed_tray = feed_tray_position(feed_purity, product_yield, product_purity, N)
     assert feed_tray == pytest.approx(14.6569, abs=1e-4)
         
 
@@ -76,7 +77,7 @@ def test_multicomponent_composition():
         reference_substance = substance(
             lambda t: row['ps_reference_bottom'] if t == row['temp_bottom'] else row['ps_reference_top']
         )
-        bn, dn = fug.multicomponent_composition(
+        bn, dn = multicomponent_composition(
             nonkey_substance, reference_substance,
             row['temp_bottom'], row['temp_top'],
             row['feed_purity'],
