@@ -30,7 +30,7 @@ def UO_crystall_cooling(data,table,components2,Ts,db,Z,K):
         # get nammes of columns already produced
         columns_names = cristallization_save.columns
         # calculate new cristallization_save
-        cristallization_save2=data.apply(lambda x: table['CAS#'].apply(lambda y: calc_solubiltiy_with_gamma([str(x['Number of molecule']),y],db,t, x['R_soll'+str(t)])), axis= 1).T
+        cristallization_save2=data.apply(lambda x: table['CAS#'].apply(lambda y: calc_solubiltiy_with_gamma([str(x['Filename']),y],db,t, x['R_soll'+str(t)])), axis= 1).T
         cristallization_save2.columns = data['Number of molecule'].values
         # concat the results
         cristallization_save = pd.concat([cristallization_save, cristallization_save2], ignore_index =True, axis =1)
